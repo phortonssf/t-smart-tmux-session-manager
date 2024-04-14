@@ -113,7 +113,7 @@ get_fzf_results() {
 			get_zoxide_results
 			;;
 		*)
-			get_sessions_by_mru && get_zoxide_results # default shows both
+			get_sessions_by_mru && get_zoxide_results # default shows both<F2>
 			;;
 		esac
 	else
@@ -124,9 +124,11 @@ get_fzf_results() {
 fzf_border_label_default=' t - smart tmux session manager '
 BORDER_LABEL=${T_FZF_BORDER_LABEL:-$fzf_border_label_default}
 
-HEADER=" ^s sessions ^x zoxide ^f find"
-SESSION_BIND="ctrl-s:change-prompt(sessions> )+reload(tmux list-sessions -F '#S')"
-ZOXIDE_BIND="ctrl-x:change-prompt(zoxide> )+reload(zoxide query -l | sed -e \"$HOME_REPLACER\")"
+HEADER="^x zoxide ^s sessions ^f pwd ^h files"
+
+PWD_BIND='ctrl-f:change-prompt( PWD> )+reload(fd -H -d 2 -t d -E .git -E node_modules -E .npm )'
+SESSION_BIND="ctrl-s:change-prompt( sessions> )+reload(tmux list-sessions -F '#S')"
+ZOXIDE_BIND="ctrl-x:change-prompt(󰰸 xide>)+reload(zoxide query -l | sed -e \"$HOME_REPLACER\")"
 TAB_BIND="tab:down,btab:up"
 
 if [ $# -ge 1 ]; then # argument provided
@@ -175,6 +177,7 @@ else # argument not provided
 
 		RESULT=$(
 			(get_fzf_results) | fzf-tmux \
+				--bind "$PWD_BIND" \
 				--bind "$FIND_BIND" \
 				--bind "$SESSION_BIND" \
 				--bind "$TAB_BIND" \
@@ -182,7 +185,7 @@ else # argument not provided
 				--border-label "$BORDER_LABEL" \
 				--header "$HEADER" \
 				--no-sort \
-				--prompt "$PROMPT" \
+				--prompt "󰰸 xide>" \
 				$FZF_TMUX_OPTS
 		)
 		;;
@@ -190,6 +193,7 @@ else # argument not provided
 		RESULT=$(
 			(get_fzf_results) | fzf \
 				--bind "$FIND_BIND" \
+				--bind "$PWD_BIND" \
 				--bind "$SESSION_BIND" \
 				--bind "$TAB_BIND" \
 				--bind "$ZOXIDE_BIND" \
@@ -197,20 +201,21 @@ else # argument not provided
 				--border-label "$BORDER_LABEL" \
 				--header "$HEADER" \
 				--no-sort \
-				--prompt "$PROMPT"
+				--prompt "󰰸 xide>"
 		)
 		;;
 	serverless)
 		RESULT=$(
 			(get_fzf_results) | fzf \
+				--bind "$PWD_BIND" \
 				--bind "$FIND_BIND" \
 				--bind "$TAB_BIND" \
 				--bind "$ZOXIDE_BIND" \
 				--border \
 				--border-label "$BORDER_LABEL" \
-				--header " ^x zoxide ^f find" \
+				--header " ^x zoxide ^f pwd ^h files" \
 				--no-sort \
-				--prompt "$PROMPT"
+				--prompt "󰰸 xide>"
 		)
 		;;
 	esac
@@ -218,6 +223,8 @@ fi
 
 if [ "$RESULT" = "" ]; then # no result
 	exit 0                     # exit silently
+else
+	TMUX_ROOT="$RESULT"
 fi
 
 if [ $HOME_SED_SAFE -eq 0 ]; then
@@ -261,9 +268,11 @@ fi
 if [ "$SESSION" = "" ]; then # session is missing
 	SESSION="$SESSION_NAME"
 	if [ -e $RESULT/.t ]; then
-		tmux new-session -d -s "$SESSION" -c "$RESULT" $RESULT/.t # create session and run .t startup script
+		tmux new-session -d -s "$SESSION" -e TMUX_ROOT=$TMUX_ROOT -c "$RESULT" $RESULT/.t
 	else
-		tmux new-session -d -s "$SESSION" -c "$RESULT" # create session
+		tmux new-session -d -s "$SESSION" -c "$RESULT" -e TMUX_ROOT=$TMUX_ROOT
+
+		# create session
 	fi
 fi
 
